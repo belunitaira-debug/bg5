@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <title>Journey through the Photo Album</title>
+  <style>
+    :root { font-family: Arial, Helvetica, sans-serif; color: #432a20; background: #f8ebd7;
+      --brown:#694332; --dark:#432a20; --pink:#f5b7c6; --paper:#fffaf0;
+      --border:rgba(114,73,49,.23); --focus:#1878c5; }
+    * { box-sizing:border-box; }
+    html,body { width:100%; height:100%; margin:0; overflow:hidden; }
+    button { font:inherit; cursor:pointer; touch-action:manipulation; }
+    button:focus-visible { outline:3px solid var(--focus); outline-offset:3px; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .hidden { display:none !important; }
+    #game { width:100%; height:100vh; height:100dvh; display:flex; justify-content:center; align-items:center; overflow:hidden;
+      background:radial-gradient(ellipse at center, #fff9e9 0%, #f5e5ca 96%); }
+    .layout { width:100%; max-width:2140px; height:100%; padding:clamp(8px,1.1vw,18px); display:flex; gap:clamp(9px,1.2vw,20px);
+      align-items:center; justify-content:center; overflow:hidden; }
+    .play-area { min-width:0; flex:1 1 auto; height:100%; display:flex; align-items:center; justify-content:center; }
+    .board-frame { position:relative; width:100%; max-width:calc((100dvh - 28px)* 16 / 9); aspect-ratio:16/9;
+      isolation:isolate; line-height:0; flex:none; }
+    .board-image { display:block; width:100%; height:100%; object-fit:contain; pointer-events:none; user-select:none; }
+    #tokens { position:absolute; inset:0; pointer-events:none; }
+    .token { position:absolute; width:3%; aspect-ratio:1/1; object-fit:contain; transform:translate(-50%,-50%);
+      transition:left .17s ease-in-out,top .17s ease-in-out,filter .17s ease;
+      filter:drop-shadow(0 1px 2px rgba(70,33,16,.55)); will-change:left,top;
+      --offset-x:0px; --offset-y:0px; margin-left:var(--offset-x); margin-top:var(--offset-y); }
+    .token.active { z-index:8; filter:drop-shadow(0 1px 1px white) drop-shadow(0 0 4px #fff) drop-shadow(0 0 4px #ffc000); }
+    .sidebar { width:clamp(238px,24vw,372px); flex:none; min-height:0; max-height:100%; height:min(100%,900px); overflow:hidden;
+      display:flex; flex-direction:column; align-items:stretch; gap:clamp(7px,1vh,11px);
+      padding:clamp(10px,1.2vw,18px); border:2px solid #d9ba93; border-radius:18px;
+      background:rgba(255,250,240,.95); box-shadow:0 6px 19px rgba(79,45,22,.13); }
+    h1 { margin:0; text-align:center; font-size:clamp(17px,1.3vw,23px); line-height:1.15; color:#6f4239; }
+    .subtitle { text-align:center; color:#93715e; margin:0; font-size:clamp(12px,1vw,15px); }
+    .active-player { flex:none; display:flex; gap:8px; align-items:center; justify-content:center;
+      border:1px solid #e8cfb0; border-radius:12px; min-height:51px; padding:5px 8px; background:#fff3e4; }
+    .active-player img { width:40px; height:40px; object-fit:contain; }
+    .active-player .player-name { font-weight:800; font-size:clamp(17px,1.5vw,20px); }
+    .active-player .player-note { font-size:clamp(12px,1vw,15px); color:#88634c; margin-top:2px; }
+    .dice-controls { flex:none; display:flex; justify-content:center; gap:10px; align-items:center; }
+    #die { width:clamp(66px,7vw,108px); height:clamp(66px,7vw,108px); display:block; object-fit:contain; }
+    .action-button { border:2px solid #a76745; background:linear-gradient(#ffdfad,#f6bc82); color:#482d23; font-weight:800;
+      border-radius:14px; padding:12px 13px; min-height:48px; font-size:clamp(16px,1.3vw,20px);
+      box-shadow:0 3px 0 #bd8c62; }
+    .action-button:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 0 #bd8c62; }
+    .status { flex:none; min-height:37px; color:#61483b; padding:5px 4px; font-size:clamp(13px,1vw,16px);
+      line-height:1.2; text-align:center; font-weight:600; display:flex; justify-content:center; align-items:center; }
+    .task-panel { flex:1 1 0; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .card-shell { position:relative; width:100%; height:auto; max-height:100%; aspect-ratio:3/4; flex:none; }
+    .card-art { position:absolute; display:block; width:100%; height:100%; inset:0; object-fit:contain; user-select:none; pointer-events:none; }
+    .card-type { position:absolute; left:24%; width:54%; top:20.7%; height:10%; display:flex; align-items:center; justify-content:center;
+      text-align:center; font-weight:800; color:#6e3d35; font-size:clamp(12px,1.2vw,20px); line-height:1.05; }
+    .question { position:absolute; left:20%; width:62%; top:31%; height:39%; display:flex; align-items:center; justify-content:center;
+      padding:3%; text-align:center; color:#442d24; font-weight:750; font-size:clamp(12px,1.18vw,19px);
+      line-height:1.3; overflow-wrap:break-word; }
+    .answers { position:absolute; left:13%; right:13%; top:75%; height:18%; display:grid;
+      grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:4%; }
+    .answer-button { min-width:0; min-height:0; border-radius:9px; border:1.5px solid #b99178;
+      background:#fff9ed; color:#49352b; font-weight:750; padding:1px 3px;
+      font-size:clamp(11px,1vw,16px); line-height:1.12; overflow-wrap:anywhere; }
+    .answer-button.full { grid-column:1/-1; max-width:75%; width:100%; justify-self:center; }
+    .answer-button.correct { background:#c8efc3; border-color:#369344; color:#195b26; }
+    .answer-button.wrong { background:#ffcbcc; border-color:#b33540; color:#7b1824; }
+    .answer-button:disabled { opacity:1; }
+    .answer-feedback { position:absolute; left:17%; width:66%; top:68%; min-height:6%; display:flex; align-items:center;
+      justify-content:center; text-align:center; color:#543b2c; font-size:clamp(10px,.85vw,14px); line-height:1.1; font-weight:800; }
+    .screen-overlay { position:fixed; inset:0; background:rgba(50,35,24,.56); display:flex; justify-content:center;
+      align-items:center; z-index:30; padding:16px; }
+    .dialog { width:min(430px,96vw); max-height:calc(100dvh - 32px); overflow:hidden; background:#fff9ee; border:3px solid #e1b893;
+      border-radius:22px; box-shadow:0 15px 48px #2c1b16a8; padding:clamp(15px,3vw,30px); text-align:center; }
+    .dialog h2 { font-size:clamp(22px,3vw,28px); margin:4px 0 10px; color:#733e41; }
+    .dialog p { font-size:clamp(15px,2.2vw,18px); line-height:1.35; margin:8px 0 15px; }
+    .player-choices { display:flex; gap:9px; justify-content:center; margin:14px 0 20px; }
+    .choice { border:2px solid #c6a18b; border-radius:12px; background:#fff; min-width:70px; min-height:56px;
+      font-weight:800; font-size:23px; color:#664433; }
+    .choice.selected { background:#fbd7bc; border-color:#8c5342; box-shadow:0 0 0 2px #f5b5a4 inset; }
+    .dialog .action-button { width:100%; max-width:300px; }
+    .winner-name { font-weight:900; color:#99506b; font-size:clamp(20px,3vw,28px); }
+    @media (max-width:940px) {
+      .layout { flex-direction:column; justify-content:center; gap:clamp(8px,1.5vh,15px); padding:clamp(6px,1vw,12px); }
+      .play-area { flex:none; width:100%; height:auto; }
+      .board-frame { max-width:100%; }
+      .sidebar { width:100%; max-width:100%; height:auto; min-height:0; flex:none; display:grid;
+        grid-template-columns:minmax(0,1fr) auto; grid-template-rows:auto auto auto; align-items:center; gap:5px 12px;
+        padding:10px 12px; }
+      .sidebar h1 { grid-column:1/-1; font-size:clamp(17px,3vw,23px); }
+      .subtitle { display:none; }
+      .active-player { grid-column:1; grid-row:2; min-height:45px; justify-content:flex-start; }
+      .active-player img { width:33px;height:33px; }
+      .dice-controls { grid-column:2; grid-row:2; }
+      #die { width:54px;height:54px; }
+      .action-button { min-height:44px; padding:7px 11px; font-size:15px; }
+      .status { grid-column:1/-1; grid-row:3; min-height:28px; padding:0; font-size:14px; }
+      .task-panel { position:fixed; inset:0; z-index:25; background:rgba(58,37,25,.78); padding:clamp(10px,2vw,22px);
+        display:flex; align-items:center; justify-content:center; overflow:hidden; }
+      .card-shell { height:min(calc(100dvh - 26px),calc((100vw - 28px)*4/3)); max-width:calc(100vw - 28px); }
+      .card-type { font-size:clamp(17px,3.5vw,24px); }
+      .question { font-size:clamp(15px,3.2vw,22px); }
+      .answer-button { font-size:clamp(13px,2.5vw,19px); }
+      .answer-feedback { font-size:clamp(12px,2.1vw,16px); }
+    }
+    @media (max-width:520px) {
+      .layout { justify-content:center; gap:10px; }
+      .sidebar { padding:8px; gap:4px 6px; }
+      .sidebar h1 { font-size:16px; }
+      .active-player { padding:3px; }
+      .active-player img { width:28px; height:28px; }
+      .active-player .player-name { font-size:14px; }
+      .active-player .player-note { font-size:12px; }
+      .dice-controls { gap:5px; }
+      #die { width:43px; height:43px; }
+      .status { font-size:13px; }
+      .token { width:4%; }
+      .card-shell { height:min(calc(100dvh - 26px),calc((100vw - 18px)*4/3)); max-width:calc(100vw - 18px); }
+      .card-type { font-size:clamp(15px,4vw,19px); }
+      .question { font-size:clamp(14px,3.8vw,19px); }
+      .answer-button { font-size:clamp(12px,3.5vw,16px); }
+    }
+    @media (max-height:540px) and (min-width:941px) {
+      .sidebar { padding:6px; gap:3px; }
+      .sidebar h1 { font-size:14px; }
+      .subtitle { display:none; }
+      .active-player { min-height:33px; padding:2px; }
+      .active-player img { width:27px;height:27px; }
+      #die { width:42px;height:42px; }
+      .dice-controls .action-button { min-height:33px; padding:4px 8px; }
+      .status { min-height:21px; font-size:12px; }
+    }
+    @media (prefers-reduced-motion:reduce) { .token { transition:none; } }
+  </style>
+</head>
+<body>
+<div id="game">
+  <main class="layout" aria-label="Journey through the Photo Album game">
+    <section class="play-area" aria-label="Game board">
+      <div id="board" class="board-frame">
+        <img class="board-image" src="1.png" alt="Family photo album board with Start, twenty numbered photos, and Family Portrait finish" draggable="false">
+        <div id="tokens" aria-label="Player tokens"></div>
+      </div>
+    </section>
+    <aside class="sidebar" aria-label="Game controls">
+      <h1>Journey through the Photo Album</h1>
+      <p class="subtitle">My Family · English game</p>
+      <div class="active-player" aria-live="polite">
+        <img id="active-token" src="2.png" alt="Active player token">
+        <div><div id="player-name" class="player-name">Player 1</div><div id="player-note" class="player-note">Ready to play?</div></div>
+      </div>
+      <div class="dice-controls">
+        <img id="die" src="6.png" alt="Die face 1" draggable="false">
+        <button id="roll" class="action-button" type="button" disabled>Roll Dice</button>
+      </div>
+      <div id="status" class="status" role="status" aria-live="polite">Choose players to begin!</div>
+      <div id="task-panel" class="task-panel hidden" aria-label="Question card" role="group">
+        <div class="card-shell">
+          <img class="card-art" src="12.png" alt="Photo album question card" draggable="false">
+          <div id="question-type" class="card-type"></div>
+          <div id="question-text" class="question"></div>
+          <div id="answer-feedback" class="answer-feedback" aria-live="polite"></div>
+          <div id="answer-buttons" class="answers"></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+</div>
+<div id="setup-screen" class="screen-overlay">
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+    <h2 id="setup-title">My Family</h2>
+    <p>Travel through the photo album!<br>How many players?</p>
+    <div class="player-choices" role="group" aria-label="Number of players">
+      <button class="choice selected" type="button" data-count="2" aria-pressed="true">2</button>
+      <button class="choice" type="button" data-count="3" aria-pressed="false">3</button>
+      <button class="choice" type="button" data-count="4" aria-pressed="false">4</button>
+    </div>
+    <button id="start" class="action-button" type="button">Start Game</button>
+  </div>
+</div>
+<div id="winner-screen" class="screen-overlay hidden">
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="winner-title">
+    <h2 id="winner-title">Congratulations!</h2>
+    <p class="winner-name" id="winner-name"></p>
+    <p>You reached the Family Portrait!</p>
+    <button id="replay" class="action-button" type="button">Play Again</button>
+  </div>
+</div>
+<script>
+'use strict';
+const TOKEN_FILES = ['2.png','3.png','4.png','5.png'];
+const DICE_FILES = ['6.png','7.png','8.png','9.png','10.png','11.png'];
+// Percentage coordinates are relative to the original 2048 x 1152 board image.
+// 0 = START, 21 = FINISH. Original drawings are never modified.
+const CELLS = [
+  [15.87,18.06], [11.82,29.25], [22.75,29.17], [33.94,29.08],
+  [44.14,26.91], [57.32,26.30], [67.48,29.25], [77.83,31.34],
+  [88.13,29.77], [82.67,52.52], [69.78,52.60], [57.86,52.69],
+  [45.56,53.39], [34.47,54.43], [13.67,59.98], [24.22,79.77],
+  [34.81,78.99], [44.92,78.99], [55.57,79.43], [65.82,80.64],
+  [75.59,81.51], [90.58,79.86]
+];
+// Each image has two different, age-appropriate questions grounded in the visible photo.
+// Correct is the zero-based index in the displayed options.
+const QUESTIONS = [
+  {id:'1a',cell:1,type:'Describe',text:'Look at photo 1. What can you see?',options:['A house.','A dog.','A grandmother.'],correct:0,explanation:'It is a house.'},
+  {id:'1b',cell:1,type:'True or False',text:'Photo 1 shows a house.',options:['True','False'],correct:0,explanation:'True. It is a house.'},
+  {id:'2a',cell:2,type:'Guess Who',text:'Look at photo 2. Who are these adults in the Parents section?',options:['Parents.','Pets.','Grandparents.'],correct:0,explanation:'They are parents.'},
+  {id:'2b',cell:2,type:'Describe',text:'Look at photo 2. Choose the correct sentence.',options:['I can see three cats.','They are adults.','I can see two dogs.'],correct:1,explanation:'A woman and a man.'},
+  {id:'3a',cell:3,type:'Describe',text:'Look at photo 3. What can you see?',options:['Two people at sunset.','A red car.','A sleeping cat.'],correct:0,explanation:'Two people at sunset.'},
+  {id:'3b',cell:3,type:'True or False',text:'There are two people in photo 3.',options:['False','True'],correct:1,explanation:'True. There are two people.'},
+  {id:'4a',cell:4,type:'Describe',text:'Look at photo 4. What can you see?',options:['A school bus.','A house.','Two cats.'],correct:1,explanation:'A house.'},
+  {id:'4b',cell:4,type:'True or False',text:'Photo 4 shows a dog.',options:['True','False'],correct:1,explanation:'False. It shows a house.'},
+  {id:'5a',cell:5,type:'Describe',text:'Look at photo 5. Choose the correct sentence.',options:['A girl is reading.','He plays football.','A cat is sleeping.'],correct:1,explanation:'The boy is playing football.'},
+  {id:'5b',cell:5,type:'True or False',text:'The boy in photo 5 has footballs.',options:['False','True'],correct:1,explanation:'True. There are footballs.'},
+  {id:'6a',cell:6,type:'Guess Who',text:'Look at photo 6. The girl could be the boy’s ...',options:['sister.','grandfather.','father.'],correct:0,explanation:'His sister.'},
+  {id:'6b',cell:6,type:'Describe',text:'Look at photo 6. What can you see?',options:['Two dogs.','A boy and a girl.','Two houses.'],correct:1,explanation:'A boy and a girl.'},
+  {id:'7a',cell:7,type:'Describe',text:'Look at photo 7. Where is the boy?',options:['At the beach.','In a classroom.','In a car.'],correct:0,explanation:'He is at the beach.'},
+  {id:'7b',cell:7,type:'True or False',text:'The boy in photo 7 is at the beach.',options:['True','False'],correct:0,explanation:'True. He is at the beach.'},
+  {id:'8a',cell:8,type:'Describe',text:'Look at photo 8. Choose the correct sentence.',options:['They are together.','A girl is reading.','A dog is running.'],correct:0,explanation:'They are together.'},
+  {id:'8b',cell:8,type:'True or False',text:'Photo 8 shows two people from behind.',options:['False','True'],correct:1,explanation:'True. There are two people.'},
+  {id:'9a',cell:9,type:'Guess Who',text:'Look at photo 9. Who are the two older adults?',options:['Brother and sister.','Grandparents.','Two teachers.'],correct:1,explanation:'Grandparents.'},
+  {id:'9b',cell:9,type:'Describe',text:'Look at photo 9. What can you see?',options:['Two cats.','A family together.','An empty room.'],correct:1,explanation:'A family together.'},
+  {id:'10a',cell:10,type:'Guess Who',text:'Look at photo 10. Who is reading?',options:['A brother.','A father.','A grandmother.'],correct:2,explanation:'A grandmother is reading.'},
+  {id:'10b',cell:10,type:'True or False',text:'The grandmother in photo 10 has a book.',options:['True','False'],correct:0,explanation:'True. She has a book.'},
+  {id:'11a',cell:11,type:'Guess Who',text:'Look at photo 11. Who has a cup?',options:['Grandpa.','A sister.','A baby.'],correct:0,explanation:'A grandfather has a cup.'},
+  {id:'11b',cell:11,type:'True or False',text:'The grandfather in photo 11 is holding a cup.',options:['False','True'],correct:1,explanation:'True. He has a cup.'},
+  {id:'12a',cell:12,type:'Guess Who',text:'Look at photo 12. Who can you see?',options:['Brother and sister.','Grandparents.','Two dogs.'],correct:1,explanation:'Grandparents.'},
+  {id:'12b',cell:12,type:'True or False',text:'There are two grandparents in photo 12.',options:['True','False'],correct:0,explanation:'True. Two grandparents.'},
+  {id:'13a',cell:13,type:'Describe',text:'Look at photo 13. What can you see?',options:['A house.','A cat.','A football.'],correct:0,explanation:'It is a house.'},
+  {id:'13b',cell:13,type:'True or False',text:'Photo 13 shows a car.',options:['True','False'],correct:1,explanation:'False. It shows a house.'},
+  {id:'14a',cell:14,type:'Describe',text:'Look at photo 14. What can you see?',options:['They hold hands.','Two dogs.','Three houses.'],correct:0,explanation:'People are holding hands.'},
+  {id:'14b',cell:14,type:'True or False',text:'People are holding hands in photo 14.',options:['False','True'],correct:1,explanation:'True. They are holding hands.'},
+  {id:'15a',cell:15,type:'Describe',text:'Look at photo 15. What is this pet?',options:['A dog.','A cat.','A bird.'],correct:1,explanation:'It is a cat.'},
+  {id:'15b',cell:15,type:'True or False',text:'Photo 15 shows a dog.',options:['True','False'],correct:1,explanation:'False. It is a cat.'},
+  {id:'16a',cell:16,type:'Describe',text:'Look at photo 16. What animal is it?',options:['A cat.','A bird.','A dog.'],correct:2,explanation:'It is a dog.'},
+  {id:'16b',cell:16,type:'True or False',text:'The dog in photo 16 looks happy.',options:['False','True'],correct:1,explanation:'True. The dog looks happy.'},
+  {id:'17a',cell:17,type:'Describe',text:'Look at photo 17. What pets can you see?',options:['Two cats.','A cat and a dog.','Two birds.'],correct:1,explanation:'A cat and a dog.'},
+  {id:'17b',cell:17,type:'True or False',text:'There is a cat and a dog in photo 17.',options:['True','False'],correct:0,explanation:'True. A cat and a dog.'},
+  {id:'18a',cell:18,type:'Describe',text:'Look at photo 18. Choose the correct sentence.',options:['The cat is sleeping.','The dog is running.','The boy is reading.'],correct:1,explanation:'The dog is running.'},
+  {id:'18b',cell:18,type:'True or False',text:'The dog in photo 18 is sleeping.',options:['True','False'],correct:1,explanation:'False. The dog is running.'},
+  {id:'19a',cell:19,type:'Describe',text:'Look at photo 19. What is the cat doing?',options:['Sleeping.','Running.','Reading.'],correct:0,explanation:'The cat is sleeping.'},
+  {id:'19b',cell:19,type:'True or False',text:'There is a sleeping cat in photo 19.',options:['False','True'],correct:1,explanation:'True. The cat is sleeping.'},
+  {id:'20a',cell:20,type:'Describe',text:'Look at photo 20. How many dogs are there?',options:['One.','Three.','Two.'],correct:2,explanation:'There are two dogs.'},
+  {id:'20b',cell:20,type:'True or False',text:'Photo 20 shows three dogs.',options:['True','False'],correct:1,explanation:'False. There are two dogs.'}
+];
+const FINISH_QUESTION = {id:'finish',cell:21,type:'True or False',text:'Look at the Family Portrait. This is a big family.',options:['True','False'],correct:0,explanation:'True. It is a big family!'};
+const EVENTS = {
+  4: {kind:'smile', text:'Smile! Move forward 2 spaces!'},
+  12:{kind:'blurry',text:'Blurry photo! Go back 1 space!'},
+  16:{kind:'flash',text:'Flash! Skip your next turn!'}
+};
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve,ms));
+const game = {state:'setup', playerCount:2,players:[],turn:0,rolled:null,selectedQuestion:null,usedByCell:new Map(),winner:null};
+const tokensHost = $('tokens');
+const rollBtn = $('roll');
+let selectedCount = 2;
+
+function setStatus(text) { $('status').textContent=text; }
+function setState(next) { game.state=next; rollBtn.disabled=(next!=='waitingForRoll'); }
+function currentPlayer() {return game.players[game.turn];}
+function renderPlayer() {
+  const p=currentPlayer();
+  if (!p) return;
+  $('active-token').src=p.image;
+  $('active-token').alt=`${p.name} token`;
+  $('player-name').textContent=p.name;
+  $('player-note').textContent=p.skipNext ? 'Miss your next turn' : `Photo ${p.position===0?'START':p.position===21?'FINISH':p.position}`;
+}
+function renderTokens() {
+  const grouped = new Map();
+  game.players.forEach(p => {
+    if (!grouped.has(p.position)) grouped.set(p.position,[]);
+    grouped.get(p.position).push(p);
+  });
+  const boardWidth = $('board').getBoundingClientRect().width;
+  // All offsets are percentages of the actual board width, not the viewport.
+  const offset = Math.max(boardWidth*.008,2.5);
+  for (const p of game.players) {
+    const group=grouped.get(p.position), slot=group.indexOf(p);
+    const shift=group.length===1 ? [0,0] :
+      group.length===2 ? [[-offset,0],[offset,0]][slot] :
+      group.length===3 ? [[-offset,-offset*.7],[offset,-offset*.7],[0,offset*.85]][slot] :
+      [[-offset,-offset],[offset,-offset],[-offset,offset],[offset,offset]][slot];
+    const [x,y]=CELLS[p.position];
+    const el=p.el;
+    el.style.left=`${x}%`;
+    el.style.top=`${y}%`;
+    el.style.setProperty('--offset-x',`${shift[0]}px`);
+    el.style.setProperty('--offset-y',`${shift[1]}px`);
+    el.classList.toggle('active',p.index===game.turn);
+    el.style.zIndex=String(p.index===game.turn?8:2+p.index);
+  }
+}
+function startGame() {
+  game.playerCount=selectedCount; game.players=[];
+  game.turn=0; game.rolled=null;game.selectedQuestion=null;game.usedByCell.clear();game.winner=null;
+  tokensHost.replaceChildren();
+  for (let i=0;i<game.playerCount;i++) {
+    const p={index:i,name:`Player ${i+1}`,image:TOKEN_FILES[i],position:0,beforeRoll:0,skipNext:false,el:null};
+    const im=document.createElement('img');im.className='token';im.src=p.image;im.alt=`${p.name} token`;im.draggable=false;
+    im.setAttribute('aria-label',`${p.name} on START`);
+    tokensHost.append(im);p.el=im;game.players.push(p);
+  }
+  $('setup-screen').classList.add('hidden');
+  $('winner-screen').classList.add('hidden');
+  $('task-panel').classList.add('hidden');
+  $('die').src=DICE_FILES[0];$('die').alt='Die face 1';
+  renderPlayer();renderTokens();setState('waitingForRoll');setStatus('Roll the dice!');
+}
+async function moveToken(p, destination) {
+  destination=Math.max(0,Math.min(21,destination));
+  while (p.position!==destination) {
+    p.position += Math.sign(destination-p.position);
+    p.el.setAttribute('aria-label',`${p.name} on ${p.position===21?'FINISH':p.position===0?'START':`photo ${p.position}`}`);
+    renderTokens(); renderPlayer();
+    await sleep(205);
+  }
+}
+function randomDie() {return Math.floor(Math.random()*6)+1;}
+async function animateDie() {
+  for(let i=0;i<10;i++) {
+    const face=randomDie();$('die').src=DICE_FILES[face-1];$('die').alt=`Die face ${face}`;
+    await sleep(58);
+  }
+}
+function pickQuestion(cell) {
+  if(cell===21) return FINISH_QUESTION;
+  const pool=QUESTIONS.filter(q=>q.cell===cell);
+  if(pool.length===0) throw new Error(`Missing questions for photo ${cell}`);
+  let used=game.usedByCell.get(cell);
+  if(!used || used.size===pool.length) {used=new Set();game.usedByCell.set(cell,used);}
+  const available=pool.filter(q=>!used.has(q.id));
+  const q=available[Math.floor(Math.random()*available.length)];used.add(q.id);
+  return q;
+}
+async function rollDie() {
+  if(game.state!=='waitingForRoll') return;
+  const p=currentPlayer();p.beforeRoll=p.position;
+  setState('rolling');setStatus(`${p.name} rolls the dice...`);
+  await animateDie();
+  const face=randomDie();game.rolled=face;
+  $('die').src=DICE_FILES[face-1];$('die').alt=`Die face ${face}`;
+  setState('moving');setStatus(`${p.name}: ${face} spaces!`);
+  await moveToken(p,Math.min(21,p.position+face));
+  game.selectedQuestion=pickQuestion(p.position);
+  showQuestion(game.selectedQuestion);
+}
+function showQuestion(q) {
+  $('question-type').textContent=q.type;
+  $('question-text').textContent=q.text;
+  $('answer-feedback').textContent='';
+  const host=$('answer-buttons');host.replaceChildren();
+  q.options.forEach((answer,i)=>{
+    const btn=document.createElement('button');btn.type='button';btn.className='answer-button';
+    if (q.options.length===3 && i===2) btn.classList.add('full');
+    if (q.options.length===2) {btn.style.gridRow='1 / -1';}
+    btn.textContent=answer;btn.addEventListener('click',()=>submitAnswer(i));host.appendChild(btn);
+  });
+  setState('answering');
+  $('task-panel').classList.remove('hidden');
+  setStatus(`Photo ${q.cell===21?'FINISH':q.cell}: ${q.type}`);
+}
+async function submitAnswer(index) {
+  if(game.state!=='answering') return;
+  setState('resolving');
+  const q=game.selectedQuestion,p=currentPlayer();
+  const correct=(index===q.correct);
+  const buttons=[...$('answer-buttons').querySelectorAll('button')];
+  buttons.forEach((btn,i)=>{
+    btn.disabled=true;
+    if(i===q.correct)btn.classList.add('correct');
+    if(i===index&&!correct)btn.classList.add('wrong');
+  });
+  $('answer-feedback').textContent=correct?'Correct! Great job!':`Correct answer: ${q.options[q.correct]}`;
+  await sleep(correct?1050:1400);
+  $('task-panel').classList.add('hidden');
+  if (!correct) {
+    setState('moving');setStatus('Try again next turn!');
+    await moveToken(p,p.beforeRoll);
+    await sleep(550);
+    await advanceTurn();return;
+  }
+  if(p.position===21) {
+    game.winner=p.index;setState('finished');renderTokens();
+    $('winner-name').textContent=`${p.name}, you win!`;
+    setStatus(`${p.name} wins!`);$('winner-screen').classList.remove('hidden');
+    return;
+  }
+  const event=EVENTS[p.position];
+  if(event) {
+    setStatus(event.text);
+    await sleep(950);
+    if (event.kind==='smile'||event.kind==='blurry') {
+      setState('moving');
+      await moveToken(p,p.position+(event.kind==='smile'?2:-1));
+    } else if (event.kind==='flash') {
+      p.skipNext=true;
+      renderPlayer();
+    }
+    await sleep(350);
+  }
+  await advanceTurn();
+}
+async function advanceTurn() {
+  setState('nextTurn');
+  while(true) {
+    game.turn=(game.turn+1)%game.playerCount;
+    const p=currentPlayer();renderTokens();renderPlayer();
+    if(!p.skipNext) break;
+    p.skipNext=false;renderPlayer();setStatus(`${p.name}: Turn skipped!`);
+    await sleep(1100);
+  }
+  setState('waitingForRoll');renderTokens();renderPlayer();setStatus(`${currentPlayer().name}, roll the dice!`);
+}
+for(const btn of document.querySelectorAll('.choice')) {
+  btn.addEventListener('click',()=>{
+    selectedCount=Number(btn.dataset.count);
+    document.querySelectorAll('.choice').forEach(other=>{
+      const selected=other===btn;other.classList.toggle('selected',selected);other.setAttribute('aria-pressed',String(selected));
+    });
+  });
+}
+$('start').addEventListener('click',startGame);
+$('roll').addEventListener('click',rollDie);
+$('replay').addEventListener('click',()=>{
+  $('winner-screen').classList.add('hidden');
+  $('setup-screen').classList.remove('hidden');
+  $('task-panel').classList.add('hidden');
+  setState('setup');setStatus('Choose players to begin!');
+});
+window.addEventListener('resize',()=>{if(game.players.length)renderTokens();},{passive:true});
+</script>
+</body>
+</html>
